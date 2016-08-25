@@ -2,7 +2,10 @@ package deploybot
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"regexp"
+	"text/template"
 
 	"github.com/abourget/slick"
 	"github.com/nlopes/slack"
@@ -28,17 +31,23 @@ func (dep *DeployBot) InitPlugin(bot *slick.Bot) {
 		"unix:///var/run/docker.sock",
 		"https://597304777786.dkr.ecr.eu-west-1.amazonaws.com",
 		"AWS",
-		"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",
+		"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",
 	)
 }
 
-var deployFormat = regexp.MustCompile(`(?:deploy|ship)$`)
-var deployFromFormat = regexp.MustCompile(`(?:deploy|ship) ([a-zA-Z0-9_\.-]+)$`)
+var cy = false
+
+// var deployFormat = regexp.MustCompile(`(?:deploy|ship)$`)
+// var deployFromFormat = regexp.MustCompile(`(?:deploy|ship) ([a-zA-Z0-9_\.-]+)$`)
 var deployFromToFormat = regexp.MustCompile(`(?:deploy|ship) ([a-zA-Z0-9_\.-]+) to ([a-z_-]+)$`)
-var listImagesFormat = regexp.MustCompile(`list (images for )?([a-zA-Z_-]+)`)
+var listImagesFormat = regexp.MustCompile(`list (?:images for )?([a-zA-Z_-]+)`)
+
+var deployFromToFormatCy = regexp.MustCompile(`cludwch ([a-zA-Z0-9_\.-]+) at ([a-z_-]+)$`)
+var listImagesFormatCy = regexp.MustCompile(`rhestrwch (?:delwau am )?([a-zA-Z_-]+)`)
 
 // ChatHandler handles chat events.
 func (dep *DeployBot) ChatHandler(listen *slick.Listener, msg *slick.Message) {
+	cy = false
 
 	if msg.Contains("beer") {
 		go func() {
@@ -49,29 +58,42 @@ func (dep *DeployBot) ChatHandler(listen *slick.Listener, msg *slick.Message) {
 	if msg.MentionsMe {
 		if msg.ContainsAny([]string{"thanks", "thank you", "thx", "thnks", "cheers"}) {
 			msg.Reply("My pleasure.")
+			return
+		}
+		if msg.ContainsAny([]string{"diolch"}) {
+			msg.Reply("Â chroeso.")
+			return
 		}
 	}
 
 	// Serious stuff now.
 
-	// Discard non "mention_name, " prefixed messages
-	// if !strings.HasPrefix(msg.Text, fmt.Sprintf("%s, ", bot.Config.Nickname)) {
-	// 	return
-	// }
-
 	var match []string
 	if match = deployFromToFormat.FindStringSubmatch(msg.Text); match != nil {
-		dep.confirmDeploy(listen.Bot, msg, match[1], match[2])
-		// reaction = "100"
+		dep.deploy(msg, match[1], match[2])
+		msg.AddReaction("thumbsup")
+	} else if match = deployFromToFormatCy.FindStringSubmatch(msg.Text); match != nil {
+		cy = true
+		dep.deploy(msg, match[1], match[2])
+		msg.AddReaction("thumbsup")
 	} else if match = listImagesFormat.FindStringSubmatch(msg.Text); match != nil {
-		dep.listImages(listen.Bot, msg, match[2])
+		fmt.Printf("%v", match)
+		dep.listImages(listen.Bot, msg, match[1])
+	} else if match = listImagesFormatCy.FindStringSubmatch(msg.Text); match != nil {
+		cy = true
+		dep.listImages(listen.Bot, msg, match[1])
 	} else {
 		msg.Reply("Sorry, I'm not sure what you mean there.")
 	}
 }
 
 func (dep *DeployBot) listImages(bot *slick.Bot, msg *slick.Message, repo string) {
-	msg.Reply("Listing images for %s…", repo)
+
+	if cy {
+		msg.Reply("Dw i'n rhestru delwau am %s…", repo)
+	} else {
+		msg.Reply("Listing images for %s…", repo)
+	}
 	imageHistory, _ := dep.DockerClient.GetRepoImages(repo)
 
 	actions := []slack.AttachmentAction{}
@@ -101,7 +123,13 @@ func (dep *DeployBot) listImages(bot *slick.Bot, msg *slick.Message, repo string
 		Actions:    actions,
 	}
 	params.Attachments = []slack.Attachment{attachment}
-	channelID, timestamp, err := bot.Slack.PostMessage(msg.Channel, "Which image would you like me to ship?", params)
+	txt := ""
+	if cy {
+		txt = "Pa ddelw hoffech chi cludo?"
+	} else {
+		txt = "Which image would you like me to ship?"
+	}
+	channelID, timestamp, err := bot.Slack.PostMessage(msg.Channel, txt, params)
 	if err != nil {
 		fmt.Printf("NO FUCKING BUTTONS %s\n", err)
 		return
@@ -110,37 +138,130 @@ func (dep *DeployBot) listImages(bot *slick.Bot, msg *slick.Message, repo string
 }
 
 // Show yes/no buttons to confirm the deploy.
-func (dep *DeployBot) confirmDeploy(bot *slick.Bot, msg *slick.Message, from, to string) {
-	params := slack.NewPostMessageParameters()
-	params.AsUser = true
-	params.Username = "llong"
-	attachment := slack.Attachment{
-		// Pretext: "some pretext",
-		Text: "Are you sure?",
-		// Uncomment the following part to send a field too
-		Fallback:   "No joy",
-		CallbackID: "foobar",
-		Color:      "#FF0000",
-		Actions: []slack.AttachmentAction{
-			slack.AttachmentAction{
-				Name:  "YES",
-				Text:  "Make it so.",
-				Type:  "button",
-				Value: "YES",
-			},
-			slack.AttachmentAction{
-				Name:  "NO",
-				Text:  "Woah",
-				Type:  "button",
-				Value: "NO",
-			},
-		},
+func (dep *DeployBot) deploy(msg *slick.Message, from, to string) {
+	if cy {
+		msg.Reply("Dw i'n gweitio arno fe.")
+	} else {
+		msg.Reply("I'm on it.")
 	}
-	params.Attachments = []slack.Attachment{attachment}
-	channelID, timestamp, err := bot.Slack.PostMessage(msg.Channel, fmt.Sprintf("Ship %s to %s?", from, to), params)
+	img := "597304777786.dkr.ecr.eu-west-1.amazonaws.com/" + from
+	tag := "68534ce"
+	err := deploy(dep.DockerClient, img, tag, to)
+	if err == nil {
+		if cy {
+			msg.Reply("Dyna chi.")
+		} else {
+			msg.Reply("Ta Da!")
+		}
+	} else {
+		if cy {
+			msg.Reply(fmt.Sprintf("Roedd problem gyda'ch lleoliad: ```%v```", err))
+		} else {
+			msg.Reply(fmt.Sprintf("There was a problem with your deployment: ```%v```", err))
+		}
+
+	}
+}
+
+//Deploy deploys the app
+func deploy(client *llongdocker.LlongDockerClient, image, tag, env string) error {
+
+	imgConfig, err := client.GetImageConfig(image, tag)
 	if err != nil {
-		fmt.Printf("NO FUCKING BUTTONS %s\n", err)
-		return
+		fmt.Printf("Llongdocker error: %v", err)
+		return err
 	}
-	fmt.Printf("Message successfully sent to channel %s at %s", channelID, timestamp)
+	fmt.Printf("%v", imgConfig)
+	imgConfig.Image = image
+	imgConfig.Env = env
+
+	memcached := false
+	if val, ok := imgConfig.Dependencies["memcached"]; ok {
+		memcached = val
+	}
+
+	data := struct {
+		AppName        string
+		AppDescription string
+		HostPort       int
+		ContainerPort  int
+		Env            string
+		Image          string
+
+		Memcached bool
+	}{
+		imgConfig.AppName,
+		imgConfig.AppDescription,
+		imgConfig.HostPort,
+		imgConfig.ContainerPort,
+		imgConfig.Env,
+		imgConfig.Image,
+		memcached,
+	}
+
+	t := template.New("app")
+	t, err = t.Parse(`
+    provider "aws"{
+        region = "eu-west-1"
+    }
+
+    {{if .Memcached}}
+    resource "aws_elasticache_cluster" "bar" {
+        cluster_id = "{{.AppName}}-{{.Env}}"
+        engine = "memcached"
+        node_type = "cache.t2.micro"
+        port = 11211
+        num_cache_nodes = 1
+        parameter_group_name = "default.memcached1.4"
+    }
+    {{end}}
+
+    resource "aws_ecs_service" "{{.AppName}}-{{.Env}}" {
+        name = "{{.AppName}}-{{.Env}}"
+        cluster = "arn:aws:ecs:eu-west-1:597304777786:cluster/llong"
+        task_definition = "${aws_ecs_task_definition.{{.AppName}}-{{.Env}}.arn}"
+        desired_count = 1
+    }
+
+       resource "aws_ecs_task_definition" "{{.AppName}}-{{.Env}}" {
+        family = "{{.AppName}}-{{.Env}}"
+        container_definitions = <<EOF
+        [
+        {
+            "name": "{{.AppName}}-{{.Env}}",
+            "image": "{{.Image}}",
+            "cpu": 10,
+            "memory": 100,
+            "essential": true,
+
+            {{if .Memcached}}
+             "environment" : [
+                { "name" : "memcached_host", "value" : "${aws_elasticache_cluster.bar.cache_nodes.0.address}" }
+            ],
+            {{end}}
+
+            "portMappings": [
+            {
+                "containerPort": {{.ContainerPort}},
+                "hostPort": {{.HostPort}}
+            }
+            ]
+        }
+        ]
+    EOF
+    }`)
+
+	f, err := os.Create("app.tf")
+	if err != nil {
+		return fmt.Errorf("error creating terraform file: %s", err.Error())
+	}
+
+	t.Execute(f, data)
+
+	err = exec.Command("terraform", "apply").Run()
+	if err != nil {
+		return fmt.Errorf("error exucuting terraform: %s", err.Error())
+	}
+
+	return nil
 }
