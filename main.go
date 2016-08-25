@@ -4,8 +4,9 @@ import (
 	"flag"
 
 	"github.com/abourget/slick"
-	// _ "github.com/abourget/slick/web"
+	_ "github.com/abourget/slick/web"
 	// _ "github.com/abourget/slick/webauth"
+	_ "github.com/itsoneiota/llong/buttons"
 	_ "github.com/itsoneiota/llong/deploybot"
 )
 
