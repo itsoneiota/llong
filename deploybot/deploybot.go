@@ -81,7 +81,7 @@ func (dep *DeployBot) listImages(bot *slick.Bot, msg *slick.Message, repo string
 		if img.ImageTag != nil {
 			displayName = *img.ImageTag
 		}
-		value := *img.ImageDigest
+		value := "https://597304777786.dkr.ecr.eu-west-1.amazonaws.com/" + repo
 		button := slack.AttachmentAction{
 			Name:  value,
 			Text:  displayName,
@@ -91,7 +91,9 @@ func (dep *DeployBot) listImages(bot *slick.Bot, msg *slick.Message, repo string
 		actions = append(actions, button)
 	}
 
-	params := slack.PostMessageParameters{}
+	params := slack.NewPostMessageParameters()
+	params.AsUser = true
+	params.Username = "llong"
 	attachment := slack.Attachment{
 		Fallback:   "No joy",
 		CallbackID: "123",
@@ -109,7 +111,9 @@ func (dep *DeployBot) listImages(bot *slick.Bot, msg *slick.Message, repo string
 
 // Show yes/no buttons to confirm the deploy.
 func (dep *DeployBot) confirmDeploy(bot *slick.Bot, msg *slick.Message, from, to string) {
-	params := slack.PostMessageParameters{}
+	params := slack.NewPostMessageParameters()
+	params.AsUser = true
+	params.Username = "llong"
 	attachment := slack.Attachment{
 		// Pretext: "some pretext",
 		Text: "Are you sure?",
@@ -133,7 +137,7 @@ func (dep *DeployBot) confirmDeploy(bot *slick.Bot, msg *slick.Message, from, to
 		},
 	}
 	params.Attachments = []slack.Attachment{attachment}
-	channelID, timestamp, err := bot.PubRTM.PostMessage(msg.Channel, fmt.Sprintf("Ship %s to %s?", from, to), params)
+	channelID, timestamp, err := bot.Slack.PostMessage(msg.Channel, fmt.Sprintf("Ship %s to %s?", from, to), params)
 	if err != nil {
 		fmt.Printf("NO FUCKING BUTTONS %s\n", err)
 		return
