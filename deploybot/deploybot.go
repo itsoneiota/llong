@@ -76,6 +76,7 @@ func (dep *DeployBot) ChatHandler(listen *slick.Listener, msg *slick.Message) {
 		cy = true
 		dep.deploy(msg, match[1], match[2])
 		msg.AddReaction("thumbsup")
+		return
 	} else if match = listImagesFormat.FindStringSubmatch(msg.Text); match != nil {
 		fmt.Printf("%v", match)
 		dep.listImages(listen.Bot, msg, match[1])
@@ -145,7 +146,7 @@ func (dep *DeployBot) deploy(msg *slick.Message, from, to string) {
 		msg.Reply("I'm on it.")
 	}
 	img := "597304777786.dkr.ecr.eu-west-1.amazonaws.com/" + from
-	tag := "68534ce"
+	tag := "dd71ecd"
 	err := deploy(dep.DockerClient, img, tag, to)
 	if err == nil {
 		if cy {
@@ -205,14 +206,29 @@ func deploy(client *llongdocker.LlongDockerClient, image, tag, env string) error
         region = "eu-west-1"
     }
 
+	data "terraform_remote_state" "state" {
+		backend = "s3"
+		config {
+			bucket = "llong"
+			key = "{{.AppName}}-{{.Env}}/terraform.tfstate"
+			region = "eu-west-1"
+		}
+	}
+
     {{if .Memcached}}
-    resource "aws_elasticache_cluster" "bar" {
+    resource "aws_elasticache_cluster" "{{.AppName}}-{{.Env}}-cache" {
         cluster_id = "{{.AppName}}-{{.Env}}"
         engine = "memcached"
         node_type = "cache.t2.micro"
         port = 11211
         num_cache_nodes = 1
         parameter_group_name = "default.memcached1.4"
+		subnet_group_name = "${aws_elasticache_subnet_group.{{.AppName}}-{{.Env}}.name}"
+    }
+
+	resource "aws_elasticache_subnet_group" "{{.AppName}}-{{.Env}}" {
+        name = "{{.AppName}}-{{.Env}}-subnet-group"
+        subnet_ids = ["subnet-6373d03b"]
     }
     {{end}}
 
@@ -236,7 +252,7 @@ func deploy(client *llongdocker.LlongDockerClient, image, tag, env string) error
 
             {{if .Memcached}}
              "environment" : [
-                { "name" : "memcached_host", "value" : "${aws_elasticache_cluster.bar.cache_nodes.0.address}" }
+                { "name" : "memcached_host", "value" : "${aws_elasticache_cluster.{{.AppName}}-{{.Env}}-cache.cache_nodes.0.address}" }
             ],
             {{end}}
 
@@ -257,6 +273,11 @@ func deploy(client *llongdocker.LlongDockerClient, image, tag, env string) error
 	}
 
 	t.Execute(f, data)
+
+	err = exec.Command("./tfs3", fmt.Sprintf("%s-%s", imgConfig.AppName, imgConfig.Env)).Run()
+	if err != nil {
+		return fmt.Errorf("error getting state of current deployment: %s", err.Error())
+	}
 
 	err = exec.Command("terraform", "apply").Run()
 	if err != nil {
