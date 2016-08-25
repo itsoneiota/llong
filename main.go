@@ -34,13 +34,47 @@ func Deploy(image, tag, env string) error {
 	imgConfig.Image = image
 	imgConfig.Env = env
 
-	t := template.New("app")
+	memcached := false
+	if val, ok := App.Dependencies["memcached"]; ok {
+		memcached = val
+	}
 
-	t, err = t.Parse(`
+	data := struct {
+		AppName        string
+		AppDescription string
+		HostPort       int
+		ContainerPort  int
+		Env            string
+		Image          string
+
+		Memcached bool
+	}{
+		App.AppName,
+		App.AppDescription,
+		App.HostPort,
+		App.ContainerPort,
+		App.Env,
+		App.Image,
+		memcached,
+	}
+
+	t := template.New("app")
+	t, err := t.Parse(`
     provider "aws"{
         region = "eu-west-1"
     }
     
+    {{if .Memcached}}
+    resource "aws_elasticache_cluster" "bar" {
+        cluster_id = "{{.AppName}}-{{.Env}}"
+        engine = "memcached"
+        node_type = "cache.t2.micro"
+        port = 11211
+        num_cache_nodes = 1
+        parameter_group_name = "default.memcached1.4"
+    }
+    {{end}}
+
     resource "aws_ecs_service" "{{.AppName}}-{{.Env}}" {
         name = "{{.AppName}}-{{.Env}}"
         cluster = "arn:aws:ecs:eu-west-1:597304777786:cluster/llong"
@@ -48,7 +82,7 @@ func Deploy(image, tag, env string) error {
         desired_count = 1
     }
     
-    resource "aws_ecs_task_definition" "{{.AppName}}-{{.Env}}" {
+       resource "aws_ecs_task_definition" "{{.AppName}}-{{.Env}}" {
         family = "{{.AppName}}-{{.Env}}"
         container_definitions = <<EOF
         [
@@ -58,6 +92,13 @@ func Deploy(image, tag, env string) error {
             "cpu": 10,
             "memory": 100,
             "essential": true,
+
+            {{if .Memcached}}
+             "environment" : [
+                { "name" : "memcached_host", "value" : "${aws_elasticache_cluster.bar.cache_nodes.0.address}" }
+            ],
+            {{end}}
+
             "portMappings": [
             {
                 "containerPort": {{.ContainerPort}},
@@ -74,7 +115,7 @@ func Deploy(image, tag, env string) error {
 		return fmt.Errorf("error creating terraform file: %s", err.Error())
 	}
 
-	t.Execute(f, imgConfig)
+	t.Execute(f, data)
 
 	err = exec.Command("terraform", "apply").Run()
 	if err != nil {
